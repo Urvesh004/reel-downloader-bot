@@ -1,6 +1,7 @@
 import os
 import instaloader
 from telegram import Update
+from dotenv import load_dotenv
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
@@ -9,7 +10,11 @@ from telegram.ext import (
     filters
 )
 
-TOKEN = "7661614200:AAH2ScpJyYLgln5dkiGYVXM7DyRSeIdquHs"
+
+load_dotenv()
+
+TOKEN = os.getenv("BOT_TOKEN")
+
 
 loader = instaloader.Instaloader(
     dirname_pattern="downloads",
