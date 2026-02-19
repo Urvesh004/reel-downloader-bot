@@ -16,10 +16,6 @@ from telegram.ext import (
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-if not TOKEN:
-    raise ValueError("BOT_TOKEN not set! Add it in Render Environment Variables.")
-
-
 # ✅ INSTALOADER SETUP
 
 loader = instaloader.Instaloader(
