@@ -2,7 +2,7 @@ import os
 import threading
 import instaloader
 from flask import Flask
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, BotCommand, MenuButtonCommands
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
@@ -11,16 +11,10 @@ from telegram.ext import (
     filters,
 )
 
+
 # ✅ TOKEN SETUP
 
 TOKEN = os.getenv("BOT_TOKEN")
-
-if not TOKEN:
-    raise ValueError("BOT_TOKEN not set! Add it in Render Environment Variables.")
-
-# ✅ ACTIVE USER CONTROL
-
-active_users = set()
 
 # ✅ INSTALOADER SETUP
 
@@ -30,7 +24,8 @@ loader = instaloader.Instaloader(
 
 os.makedirs("downloads", exist_ok=True)
 
-# ✅ DUMMY WEB SERVER (Render Free Plan)
+
+# ✅ DUMMY WEB SERVER (Render Free Web Service)
 
 web_app = Flask(__name__)
 
@@ -45,65 +40,36 @@ def run_web():
     web_app.run(host="0.0.0.0", port=port)
 
 
-# ✅ MENU KEYBOARD
-
-
-def get_menu():
-    keyboard = [["📥 Download"], ["❓ Help", "❌ Exit"]]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-
 # ✅ START COMMAND
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    active_users.add(user_id)
-
     await update.message.reply_text(
-        "👋 Welcome!\n\nSend Instagram Reel/Post link to download.",
-        reply_markup=get_menu(),
+        "👋 Welcome!\n\n"
+        "Send Instagram Reel/Post link to download.\n\n"
+        "Use help Option for guidance."
     )
 
 
-# ✅ EXIT COMMAND (stop for user only)
+# ✅ HELP COMMAND
 
 
-async def exit_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    active_users.discard(user_id)
-
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Bot stopped for you.\nSend /start to use again."
+        "📌 How to use:\n\n"
+        "1️⃣ Send /start\n"
+        "2️⃣ Paste Instagram Reel/Post link\n"
+        "3️⃣ Bot downloads media\n\n"
+        "Supported:\n"
+        "✅ Reels\n"
+        "✅ Posts"
     )
-
-
-# ✅ MENU BUTTON HANDLER
-
-
-async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.lower()
-
-    if "help" in text:
-        await update.message.reply_text("📌 Send Instagram reel/post link to download.")
-
-    elif "exit" in text:
-        await exit_bot(update, context)
-
-    elif "download" in text:
-        await update.message.reply_text("Send Instagram link.")
 
 
 # ✅ DOWNLOAD FUNCTION
 
 
 async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    # ignore if user exited
-    if user_id not in active_users:
-        return
-
     url = update.message.text.strip()
 
     if "instagram.com" not in url:
@@ -112,15 +78,8 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
     message = await update.message.reply_text("Downloading... ⏳")
 
     try:
-        # remove query parameters (?...)
-        url = url.split("?")[0]
-
-        # remove trailing slash
-        url = url.rstrip("/")
-
-        # extract shortcode
-        parts = url.split("/")
-        shortcode = parts[-1]
+        url = url.split("?")[0].rstrip("/")
+        shortcode = url.split("/")[-1]
 
         post = instaloader.Post.from_shortcode(loader.context, shortcode)
 
@@ -157,6 +116,8 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await message.delete()
         except:
             pass
+        
+# ✅ AUTO DELETE ALL FILES AFTER COMPLETION
 
         for f in os.listdir("downloads"):
             try:
@@ -170,15 +131,31 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("exit", exit_bot))
-app.add_handler(
-    MessageHandler(filters.Regex("^(📥 Download|❓ Help|❌ Exit)$"), menu_handler)
-)
+app.add_handler(CommandHandler("help", help_cmd))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_instagram))
+
+
+# ✅ FORCE TELEGRAM MENU BUTTON (☰ Menu)
+
+
+async def set_commands(app):
+    # command list
+    await app.bot.set_my_commands(
+        [
+            BotCommand("start", "Start bot"),
+            BotCommand("help", "Help guide"),
+        ]
+    )
+
+    # show blue menu button like your 2nd image
+    await app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+
+
+app.post_init = set_commands
 
 print("✅ Bot running...")
 
-# run web server for Render
+# run web server (Render requirement)
 threading.Thread(target=run_web, daemon=True).start()
 
 # run telegram bot
