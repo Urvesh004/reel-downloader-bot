@@ -71,15 +71,12 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
     url = update.message.text.strip()
 
     if "instagram.com" not in url:
-        await update.message.reply_text("❌ Send valid Instagram link")
+        # await update.message.reply_text("❌ Send valid Instagram link")
         return
 
     await update.message.reply_text("Downloading... ⏳")
 
     try:
-        # # safer shortcode extraction
-        # parts = [p for p in url.split("/") if p]
-        # shortcode = parts[-1] if parts[-1] not in ["reel", "p"] else parts[-2]
         # remove query parameters (?...)
         url = url.split("?")[0]
 
