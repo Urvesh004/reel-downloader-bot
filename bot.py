@@ -1,5 +1,7 @@
 import os
+import threading
 import instaloader
+from flask import Flask
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -9,8 +11,17 @@ from telegram.ext import (
     filters
 )
 
+# =========================
+# ✅ TOKEN SETUP
+# =========================
 TOKEN = os.getenv("BOT_TOKEN")
 
+if not TOKEN:
+    raise ValueError("BOT_TOKEN not set! Add it in Render Environment Variables.")
+
+# =========================
+# ✅ INSTALOADER SETUP
+# =========================
 loader = instaloader.Instaloader(
     dirname_pattern="downloads",
     save_metadata=False,
@@ -19,7 +30,22 @@ loader = instaloader.Instaloader(
 
 os.makedirs("downloads", exist_ok=True)
 
+# =========================
+# ✅ DUMMY WEB SERVER (for Render Free Web Service)
+# =========================
+web_app = Flask(__name__)
+
+@web_app.route("/")
+def home():
+    return "Telegram Bot is running!"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    web_app.run(host="0.0.0.0", port=port)
+
+# =========================
 # ✅ START COMMAND
+# =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome!\n\n"
@@ -29,15 +55,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/exit → Stop bot"
     )
 
-
+# =========================
 # ✅ EXIT COMMAND
+# =========================
 async def exit_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Bot stopped.\nSend /start to use again."
     )
 
-
+# =========================
 # ✅ DOWNLOAD FUNCTION
+# =========================
 async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
 
@@ -48,7 +76,10 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text("Downloading... ⏳")
 
     try:
-        shortcode = url.split("/")[4] if "instagram.com" in url else url.split("/")[-2]
+        # safer shortcode extraction
+        parts = [p for p in url.split("/") if p]
+        shortcode = parts[-1] if parts[-1] not in ["reel", "p"] else parts[-2]
+
         post = instaloader.Post.from_shortcode(loader.context, shortcode)
 
         # clear old files
@@ -85,7 +116,10 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 os.remove(os.path.join("downloads", f))
             except:
                 pass
-# ✅ BOT SETUP
+
+# =========================
+# ✅ TELEGRAM BOT SETUP
+# =========================
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
@@ -93,4 +127,9 @@ app.add_handler(CommandHandler("exit", exit_bot))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_instagram))
 
 print("✅ Bot running...")
+
+# run web server (Render requirement)
+threading.Thread(target=run_web).start()
+
+# run telegram bot
 app.run_polling()
