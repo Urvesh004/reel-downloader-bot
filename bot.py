@@ -74,7 +74,7 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # await update.message.reply_text("❌ Send valid Instagram link")
         return
 
-    await update.message.reply_text("Downloading... ⏳")
+    # await update.message.reply_text("Downloading... ⏳")
 
     try:
         # remove query parameters (?...)
