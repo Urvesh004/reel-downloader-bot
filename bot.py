@@ -74,7 +74,7 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # await update.message.reply_text("❌ Send valid Instagram link")
         return
 
-    # await update.message.reply_text("Downloading... ⏳")
+    message = await update.message.reply_text("Downloading... ⏳")
 
     try:
         # remove query parameters (?...)
@@ -118,6 +118,10 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("❌ Failed to download")
 
     finally:
+        try:
+            await message.delete()
+        except:
+            pass
         for f in os.listdir("downloads"):
             try:
                 os.remove(os.path.join("downloads", f))
