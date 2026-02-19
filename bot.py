@@ -1,7 +1,6 @@
 import os
 import instaloader
 from telegram import Update
-from dotenv import load_dotenv
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
@@ -10,11 +9,7 @@ from telegram.ext import (
     filters
 )
 
-
-load_dotenv()
-
 TOKEN = os.getenv("BOT_TOKEN")
-
 
 loader = instaloader.Instaloader(
     dirname_pattern="downloads",
@@ -23,7 +18,6 @@ loader = instaloader.Instaloader(
 )
 
 os.makedirs("downloads", exist_ok=True)
-
 
 # ✅ START COMMAND
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
