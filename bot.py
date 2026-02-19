@@ -8,7 +8,7 @@ from telegram.ext import (
     MessageHandler,
     CommandHandler,
     ContextTypes,
-    filters
+    filters,
 )
 
 # =========================
@@ -23,9 +23,7 @@ if not TOKEN:
 # ✅ INSTALOADER SETUP
 # =========================
 loader = instaloader.Instaloader(
-    dirname_pattern="downloads",
-    save_metadata=False,
-    download_comments=False
+    dirname_pattern="downloads", save_metadata=False, download_comments=False
 )
 
 os.makedirs("downloads", exist_ok=True)
@@ -35,13 +33,16 @@ os.makedirs("downloads", exist_ok=True)
 # =========================
 web_app = Flask(__name__)
 
+
 @web_app.route("/")
 def home():
     return "Telegram Bot is running!"
 
+
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host="0.0.0.0", port=port)
+
 
 # =========================
 # ✅ START COMMAND
@@ -55,13 +56,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/exit → Stop bot"
     )
 
+
 # =========================
 # ✅ EXIT COMMAND
 # =========================
 async def exit_bot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 Bot stopped.\nSend /start to use again."
-    )
+    await update.message.reply_text("👋 Bot stopped.\nSend /start to use again.")
+
 
 # =========================
 # ✅ DOWNLOAD FUNCTION
@@ -76,9 +77,18 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text("Downloading... ⏳")
 
     try:
-        # safer shortcode extraction
-        parts = [p for p in url.split("/") if p]
-        shortcode = parts[-1] if parts[-1] not in ["reel", "p"] else parts[-2]
+        # # safer shortcode extraction
+        # parts = [p for p in url.split("/") if p]
+        # shortcode = parts[-1] if parts[-1] not in ["reel", "p"] else parts[-2]
+        # remove query parameters (?...)
+        url = url.split("?")[0]
+
+        # remove trailing slash
+        url = url.rstrip("/")
+
+        # extract shortcode
+        parts = url.split("/")
+        shortcode = parts[-1]
 
         post = instaloader.Post.from_shortcode(loader.context, shortcode)
 
@@ -116,6 +126,7 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 os.remove(os.path.join("downloads", f))
             except:
                 pass
+
 
 # =========================
 # ✅ TELEGRAM BOT SETUP
