@@ -10,13 +10,28 @@ from telegram.ext import (
 )
 
 # =========================
+# LOAD ENV FILE SAFELY (PythonAnywhere fix)
+# =========================
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ENV_PATH = os.path.join(BASE_DIR, ".env")
+
+if os.path.exists(ENV_PATH):
+    from dotenv import load_dotenv
+    load_dotenv(ENV_PATH)
+
+# =========================
 # TOKEN SETUP
 # =========================
 
-TOKEN = os.getenv("BOT_TOKEN")  # PythonAnywhere -> set env var
+TOKEN = os.getenv("BOT_TOKEN")
 
 if not TOKEN:
-    raise ValueError("BOT_TOKEN not set")
+    raise ValueError(
+        "❌ BOT_TOKEN not set!\n"
+        "Create .env file in project folder:\n"
+        "BOT_TOKEN=your_token_here"
+    )
 
 # =========================
 # INSTALOADER SETUP
@@ -28,7 +43,8 @@ loader = instaloader.Instaloader(
     download_comments=False
 )
 
-os.makedirs("downloads", exist_ok=True)
+DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 # =========================
 # START COMMAND
@@ -75,25 +91,27 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
         post = instaloader.Post.from_shortcode(loader.context, shortcode)
 
         # clear old files
-        for f in os.listdir("downloads"):
+        for f in os.listdir(DOWNLOAD_DIR):
             try:
-                os.remove(os.path.join("downloads", f))
+                os.remove(os.path.join(DOWNLOAD_DIR, f))
             except:
                 pass
 
-        loader.download_post(post, target="downloads")
+        loader.download_post(post, target=DOWNLOAD_DIR)
 
         sent = False
 
-        for file in os.listdir("downloads"):
-            path = os.path.join("downloads", file)
+        for file in os.listdir(DOWNLOAD_DIR):
+            path = os.path.join(DOWNLOAD_DIR, file)
 
             if file.endswith(".mp4"):
-                await update.message.reply_video(video=open(path, "rb"))
+                with open(path, "rb") as video:
+                    await update.message.reply_video(video=video)
                 sent = True
 
             elif file.endswith((".jpg", ".jpeg", ".png")):
-                await update.message.reply_photo(photo=open(path, "rb"))
+                with open(path, "rb") as photo:
+                    await update.message.reply_photo(photo=photo)
                 sent = True
 
             os.remove(path)
@@ -102,7 +120,7 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await update.message.reply_text("⚠️ Media not found")
 
     except Exception as e:
-        print(e)
+        print("Download error:", e)
         await update.message.reply_text("❌ Failed to download")
 
     finally:
@@ -110,6 +128,12 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await message.delete()
         except:
             pass
+        for f in os.listdir("downloads"):
+            try:
+                os.remove(os.path.join("downloads", f))
+            except:
+                pass
+
 
 # =========================
 # TELEGRAM MENU BUTTON
