@@ -146,6 +146,9 @@ async def set_commands(app):
     ])
     await app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
+async def error_handler(update, context):
+    print("Error:", context.error)
+
 # =========================
 # BOT SETUP
 # =========================
@@ -155,7 +158,8 @@ app = ApplicationBuilder().token(TOKEN).post_init(set_commands).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("help", help_cmd))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_instagram))
+app.add_error_handler(error_handler)
 
 print("✅ Telegram bot running 24/7...")
 
-app.run_polling()
+app.run_polling(drop_pending_updates=True)
