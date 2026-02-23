@@ -1,7 +1,5 @@
 import os
-import threading
 import instaloader
-from flask import Flask
 from telegram import Update, BotCommand, MenuButtonCommands
 from telegram.ext import (
     ApplicationBuilder,
@@ -11,48 +9,41 @@ from telegram.ext import (
     filters,
 )
 
+# =========================
+# TOKEN SETUP
+# =========================
 
-# ✅ TOKEN SETUP
+TOKEN = os.getenv("BOT_TOKEN")  # PythonAnywhere -> set env var
 
-TOKEN = os.getenv("BOT_TOKEN")
+if not TOKEN:
+    raise ValueError("BOT_TOKEN not set")
 
-# ✅ INSTALOADER SETUP
+# =========================
+# INSTALOADER SETUP
+# =========================
 
 loader = instaloader.Instaloader(
-    dirname_pattern="downloads", save_metadata=False, download_comments=False
+    dirname_pattern="downloads",
+    save_metadata=False,
+    download_comments=False
 )
 
 os.makedirs("downloads", exist_ok=True)
 
-
-# ✅ DUMMY WEB SERVER (Render Free Web Service)
-
-web_app = Flask(__name__)
-
-
-@web_app.route("/")
-def home():
-    return "Telegram Bot is running!"
-
-
-def run_web():
-    port = int(os.environ.get("PORT", 10000))
-    web_app.run(host="0.0.0.0", port=port)
-
-
-# ✅ START COMMAND
-
+# =========================
+# START COMMAND
+# =========================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome!\n\n"
         "Send Instagram Reel/Post link to download.\n\n"
-        "Use help Option for guidance."
+        "Use /help for guidance."
     )
 
-
-# ✅ HELP COMMAND
-
+# =========================
+# HELP COMMAND
+# =========================
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -65,9 +56,9 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ Posts"
     )
 
-
-# ✅ DOWNLOAD FUNCTION
-
+# =========================
+# DOWNLOAD FUNCTION
+# =========================
 
 async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
@@ -85,7 +76,10 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         # clear old files
         for f in os.listdir("downloads"):
-            os.remove(os.path.join("downloads", f))
+            try:
+                os.remove(os.path.join("downloads", f))
+            except:
+                pass
 
         loader.download_post(post, target="downloads")
 
@@ -116,47 +110,28 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await message.delete()
         except:
             pass
-        
-# ✅ AUTO DELETE ALL FILES AFTER COMPLETION
 
-        for f in os.listdir("downloads"):
-            try:
-                os.remove(os.path.join("downloads", f))
-            except:
-                pass
+# =========================
+# TELEGRAM MENU BUTTON
+# =========================
 
+async def set_commands(app):
+    await app.bot.set_my_commands([
+        BotCommand("start", "Start bot"),
+        BotCommand("help", "Help guide"),
+    ])
+    await app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
-# ✅ TELEGRAM BOT SETUP
+# =========================
+# BOT SETUP
+# =========================
 
-app = ApplicationBuilder().token(TOKEN).build()
+app = ApplicationBuilder().token(TOKEN).post_init(set_commands).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("help", help_cmd))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_instagram))
 
+print("✅ Telegram bot running 24/7...")
 
-# ✅ FORCE TELEGRAM MENU BUTTON (☰ Menu)
-
-
-async def set_commands(app):
-    # command list
-    await app.bot.set_my_commands(
-        [
-            BotCommand("start", "Start bot"),
-            BotCommand("help", "Help guide"),
-        ]
-    )
-
-    # show blue menu button like your 2nd image
-    await app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
-
-
-app.post_init = set_commands
-
-print("✅ Bot running...")
-
-# run web server (Render requirement)
-threading.Thread(target=run_web, daemon=True).start()
-
-# run telegram bot
 app.run_polling()
