@@ -1,6 +1,7 @@
 import os
 import instaloader
 from telegram import Update, BotCommand, MenuButtonCommands
+from dotenv import load_dotenv
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
@@ -9,6 +10,7 @@ from telegram.ext import (
     filters,
 )
 
+load_dotenv()
 # =========================
 # TOKEN SETUP
 # =========================
