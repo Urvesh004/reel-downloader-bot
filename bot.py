@@ -34,12 +34,10 @@ if not TOKEN:
 
 PORT = int(os.environ.get("PORT", 10000))
 
-# ✅ Automatically detect Render URL
+# ✅ Auto detect Render URL
 WEBHOOK_URL = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("WEBHOOK_URL")
 if not WEBHOOK_URL:
     raise ValueError("❌ WEBHOOK_URL not set")
-
-WEBHOOK_PATH = "/webhook"
 
 # =========================
 # INSTALOADER
@@ -179,11 +177,11 @@ app.add_error_handler(error_handler)
 print("✅ Telegram bot running on Render Web Service...")
 
 # =========================
-# RUN WEBHOOK
+# RUN WEBHOOK (v22 FIX)
 # =========================
 app.run_webhook(
     listen="0.0.0.0",
     port=PORT,
-    webhook_url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
-    webhook_path=WEBHOOK_PATH,
+    url_path="webhook",
+    webhook_url=f"{WEBHOOK_URL}/webhook",
 )
