@@ -22,37 +22,28 @@ async def auto_restart():
 
 
 # =========================
-# LOAD ENV FILE SAFELY
+# ENV SETUP
 # =========================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ENV_PATH = os.path.join(BASE_DIR, ".env")
-
-if os.path.exists(ENV_PATH):
-    from dotenv import load_dotenv
-    load_dotenv(ENV_PATH)
-
-# =========================
-# TOKEN SETUP
-# =========================
-TOKEN = os.getenv("BOT_TOKEN")
-if not TOKEN:
-    raise ValueError("❌ BOT_TOKEN not set!")
-
-# =========================
-# RENDER PORT + WEBHOOK URL
-# =========================
-PORT = int(os.environ.get("PORT", 10000))
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-
-if not WEBHOOK_URL:
-    raise ValueError("❌ WEBHOOK_URL not set")
-
-# =========================
-# INSTALOADER SETUP
-# =========================
 DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+TOKEN = os.getenv("BOT_TOKEN")
+if not TOKEN:
+    raise ValueError("❌ BOT_TOKEN not set")
+
+PORT = int(os.environ.get("PORT", 10000))
+
+# ✅ Automatically detect Render URL
+WEBHOOK_URL = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("WEBHOOK_URL")
+if not WEBHOOK_URL:
+    raise ValueError("❌ WEBHOOK_URL not set")
+
+WEBHOOK_PATH = "/webhook"
+
+# =========================
+# INSTALOADER
+# =========================
 loader = instaloader.Instaloader(
     dirname_pattern=DOWNLOAD_DIR,
     save_metadata=False,
@@ -60,23 +51,22 @@ loader = instaloader.Instaloader(
 )
 
 # =========================
-# START COMMAND
+# COMMANDS
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome!\n\nSend Instagram Reel/Post link to download."
     )
 
-# =========================
-# HELP COMMAND
-# =========================
+
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📌 Send Instagram Reel/Post link.\nBot downloads media automatically."
     )
 
+
 # =========================
-# SHORTCODE EXTRACTOR
+# SHORTCODE EXTRACT
 # =========================
 def extract_shortcode(url: str):
     url = url.split("?")[0].rstrip("/")
@@ -85,6 +75,7 @@ def extract_shortcode(url: str):
         if part not in ["https:", "", "www.instagram.com", "instagram.com", "reel", "p", "tv"]:
             return part
     return None
+
 
 # =========================
 # DOWNLOAD FUNCTION
@@ -105,7 +96,7 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         post = instaloader.Post.from_shortcode(loader.context, shortcode)
 
-        # clear old files
+        # Clear old files
         for f in os.listdir(DOWNLOAD_DIR):
             try:
                 os.remove(os.path.join(DOWNLOAD_DIR, f))
@@ -152,8 +143,9 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
             except:
                 pass
 
+
 # =========================
-# TELEGRAM MENU BUTTON
+# MENU + INIT
 # =========================
 async def set_commands(app):
     await app.bot.set_my_commands(
@@ -164,21 +156,18 @@ async def set_commands(app):
     )
     await app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
-# =========================
-# POST INIT
-# =========================
+
 async def post_init(app):
     asyncio.create_task(auto_restart())
     await set_commands(app)
 
-# =========================
-# ERROR HANDLER
-# =========================
+
 async def error_handler(update, context):
     print("Error:", context.error)
 
+
 # =========================
-# BOT SETUP
+# APP SETUP
 # =========================
 app = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
 
@@ -195,5 +184,6 @@ print("✅ Telegram bot running on Render Web Service...")
 app.run_webhook(
     listen="0.0.0.0",
     port=PORT,
-    webhook_url=WEBHOOK_URL,
+    webhook_url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
+    webhook_path=WEBHOOK_PATH,
 )
