@@ -1,4 +1,6 @@
 import os
+import sys
+import asyncio
 import instaloader
 from telegram import Update, BotCommand, MenuButtonCommands
 from telegram.ext import (
@@ -10,7 +12,17 @@ from telegram.ext import (
 )
 
 # =========================
-# LOAD ENV FILE SAFELY (PythonAnywhere fix)
+# AUTO RESTART EVERY 10 MINUTES
+# =========================
+
+async def auto_restart():
+    await asyncio.sleep(600)  # 600 seconds = 10 minutes
+    print("♻️ Restarting bot...")
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+
+# =========================
+# LOAD ENV FILE SAFELY
 # =========================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -37,14 +49,14 @@ if not TOKEN:
 # INSTALOADER SETUP
 # =========================
 
+DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
 loader = instaloader.Instaloader(
-    dirname_pattern="downloads",
+    dirname_pattern=DOWNLOAD_DIR,
     save_metadata=False,
     download_comments=False
 )
-
-DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 # =========================
 # START COMMAND
@@ -54,7 +66,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome!\n\n"
         "Send Instagram Reel/Post link to download.\n\n"
-        "Use /help for guidance."
+        "Bot restarts automatically every 10 minutes."
     )
 
 # =========================
@@ -64,9 +76,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📌 How to use:\n\n"
-        "1️⃣ Send /start\n"
-        "2️⃣ Paste Instagram Reel/Post link\n"
-        "3️⃣ Bot downloads media\n\n"
+        "1️⃣ Send Instagram Reel/Post link\n"
+        "2️⃣ Bot downloads media\n\n"
         "Supported:\n"
         "✅ Reels\n"
         "✅ Posts"
@@ -101,20 +112,21 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         sent = False
 
-        for file in os.listdir(DOWNLOAD_DIR):
-            path = os.path.join(DOWNLOAD_DIR, file)
+        for root, dirs, files in os.walk(DOWNLOAD_DIR):
+            for file in files:
+                path = os.path.join(root, file)
 
-            if file.endswith(".mp4"):
-                with open(path, "rb") as video:
-                    await update.message.reply_video(video=video)
-                sent = True
+                if file.endswith(".mp4"):
+                    with open(path, "rb") as video:
+                        await update.message.reply_video(video=video)
+                    sent = True
 
-            elif file.endswith((".jpg", ".jpeg", ".png")):
-                with open(path, "rb") as photo:
-                    await update.message.reply_photo(photo=photo)
-                sent = True
+                elif file.endswith((".jpg", ".jpeg", ".png")):
+                    with open(path, "rb") as photo:
+                        await update.message.reply_photo(photo=photo)
+                    sent = True
 
-            os.remove(path)
+                os.remove(path)
 
         if not sent:
             await update.message.reply_text("⚠️ Media not found")
@@ -128,12 +140,6 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await message.delete()
         except:
             pass
-        for f in os.listdir("downloads"):
-            try:
-                os.remove(os.path.join("downloads", f))
-            except:
-                pass
-
 
 # =========================
 # TELEGRAM MENU BUTTON
@@ -146,6 +152,18 @@ async def set_commands(app):
     ])
     await app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
+# =========================
+# POST INIT (START RESTART TIMER)
+# =========================
+
+async def post_init(app):
+    asyncio.create_task(auto_restart())  # start restart timer
+    await set_commands(app)
+
+# =========================
+# ERROR HANDLER
+# =========================
+
 async def error_handler(update, context):
     print("Error:", context.error)
 
@@ -153,13 +171,13 @@ async def error_handler(update, context):
 # BOT SETUP
 # =========================
 
-app = ApplicationBuilder().token(TOKEN).post_init(set_commands).build()
+app = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("help", help_cmd))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_instagram))
 app.add_error_handler(error_handler)
 
-print("✅ Telegram bot running 24/7...")
+print("✅ Telegram bot running (auto restart every 10 minutes)...")
 
 app.run_polling(drop_pending_updates=True)
