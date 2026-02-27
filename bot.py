@@ -1,6 +1,4 @@
 import os
-import sys
-import asyncio
 import instaloader
 from telegram import Update, BotCommand, MenuButtonCommands
 from telegram.ext import (
@@ -12,72 +10,72 @@ from telegram.ext import (
 )
 
 # =========================
-# AUTO RESTART EVERY 10 MINUTES
+# LOAD ENV FILE SAFELY (PythonAnywhere fix)
 # =========================
-async def auto_restart():
-    while True:
-        await asyncio.sleep(600)
-        print("♻️ Restarting bot...")
-        os.execv(sys.executable, [sys.executable] + sys.argv)
 
-
-# =========================
-# ENV SETUP
-# =========================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ENV_PATH = os.path.join(BASE_DIR, ".env")
+
+if os.path.exists(ENV_PATH):
+    from dotenv import load_dotenv
+    load_dotenv(ENV_PATH)
+
+# =========================
+# TOKEN SETUP
+# =========================
+
+TOKEN = os.getenv("BOT_TOKEN")
+
+if not TOKEN:
+    raise ValueError(
+        "❌ BOT_TOKEN not set!\n"
+        "Create .env file in project folder:\n"
+        "BOT_TOKEN=your_token_here"
+    )
+
+# =========================
+# INSTALOADER SETUP
+# =========================
+
+loader = instaloader.Instaloader(
+    dirname_pattern="downloads",
+    save_metadata=False,
+    download_comments=False
+)
+
 DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-TOKEN = os.getenv("BOT_TOKEN")
-if not TOKEN:
-    raise ValueError("❌ BOT_TOKEN not set")
-
-PORT = int(os.environ.get("PORT", 10000))
-
-# ✅ Auto detect Render URL
-WEBHOOK_URL = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("WEBHOOK_URL")
-if not WEBHOOK_URL:
-    raise ValueError("❌ WEBHOOK_URL not set")
-
 # =========================
-# INSTALOADER
+# START COMMAND
 # =========================
-loader = instaloader.Instaloader(
-    dirname_pattern=DOWNLOAD_DIR,
-    save_metadata=False,
-    download_comments=False,
-)
 
-# =========================
-# COMMANDS
-# =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Welcome!\n\nSend Instagram Reel/Post link to download."
+        "👋 Welcome!\n\n"
+        "Send Instagram Reel/Post link to download.\n\n"
+        "Use /help for guidance."
     )
 
+# =========================
+# HELP COMMAND
+# =========================
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📌 Send Instagram Reel/Post link.\nBot downloads media automatically."
+        "📌 How to use:\n\n"
+        "1️⃣ Send /start\n"
+        "2️⃣ Paste Instagram Reel/Post link\n"
+        "3️⃣ Bot downloads media\n\n"
+        "Supported:\n"
+        "✅ Reels\n"
+        "✅ Posts"
     )
-
-
-# =========================
-# SHORTCODE EXTRACT
-# =========================
-def extract_shortcode(url: str):
-    url = url.split("?")[0].rstrip("/")
-    parts = url.split("/")
-    for part in parts:
-        if part not in ["https:", "", "www.instagram.com", "instagram.com", "reel", "p", "tv"]:
-            return part
-    return None
-
 
 # =========================
 # DOWNLOAD FUNCTION
 # =========================
+
 async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
 
@@ -87,14 +85,12 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
     message = await update.message.reply_text("Downloading... ⏳")
 
     try:
-        shortcode = extract_shortcode(url)
-        if not shortcode:
-            await update.message.reply_text("❌ Invalid Instagram link")
-            return
+        url = url.split("?")[0].rstrip("/")
+        shortcode = url.split("/")[-1]
 
         post = instaloader.Post.from_shortcode(loader.context, shortcode)
 
-        # Clear old files
+        # clear old files
         for f in os.listdir(DOWNLOAD_DIR):
             try:
                 os.remove(os.path.join(DOWNLOAD_DIR, f))
@@ -105,21 +101,20 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         sent = False
 
-        for root, dirs, files in os.walk(DOWNLOAD_DIR):
-            for file in files:
-                path = os.path.join(root, file)
+        for file in os.listdir(DOWNLOAD_DIR):
+            path = os.path.join(DOWNLOAD_DIR, file)
 
-                if file.endswith(".mp4"):
-                    with open(path, "rb") as video:
-                        await update.message.reply_video(video=video)
-                    sent = True
+            if file.endswith(".mp4"):
+                with open(path, "rb") as video:
+                    await update.message.reply_video(video=video)
+                sent = True
 
-                elif file.lower().endswith((".jpg", ".jpeg", ".png")):
-                    with open(path, "rb") as photo:
-                        await update.message.reply_photo(photo=photo)
-                    sent = True
+            elif file.endswith((".jpg", ".jpeg", ".png")):
+                with open(path, "rb") as photo:
+                    await update.message.reply_photo(photo=photo)
+                sent = True
 
-                os.remove(path)
+            os.remove(path)
 
         if not sent:
             await update.message.reply_text("⚠️ Media not found")
@@ -133,8 +128,6 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await message.delete()
         except:
             pass
-
-        # DO NOT REMOVE (as requested)
         for f in os.listdir("downloads"):
             try:
                 os.remove(os.path.join("downloads", f))
@@ -143,45 +136,30 @@ async def download_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 # =========================
-# MENU + INIT
+# TELEGRAM MENU BUTTON
 # =========================
+
 async def set_commands(app):
-    await app.bot.set_my_commands(
-        [
-            BotCommand("start", "Start bot"),
-            BotCommand("help", "Help guide"),
-        ]
-    )
+    await app.bot.set_my_commands([
+        BotCommand("start", "Start bot"),
+        BotCommand("help", "Help guide"),
+    ])
     await app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
-
-
-async def post_init(app):
-    asyncio.create_task(auto_restart())
-    await set_commands(app)
-
 
 async def error_handler(update, context):
     print("Error:", context.error)
 
+# =========================
+# BOT SETUP
+# =========================
 
-# =========================
-# APP SETUP
-# =========================
-app = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
+app = ApplicationBuilder().token(TOKEN).post_init(set_commands).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("help", help_cmd))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_instagram))
 app.add_error_handler(error_handler)
 
-print("✅ Telegram bot running on Render Web Service...")
+print("✅ Telegram bot running 24/7...")
 
-# =========================
-# RUN WEBHOOK (v22 FIX)
-# =========================
-app.run_webhook(
-    listen="0.0.0.0",
-    port=PORT,
-    url_path="webhook",
-    webhook_url=f"{WEBHOOK_URL}/webhook",
-)
+app.run_polling(drop_pending_updates=True)
